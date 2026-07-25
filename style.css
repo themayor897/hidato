@@ -1,0 +1,295 @@
+:root {
+  --paper: #EEF2F6;
+  --paper-line: #D7DFE7;
+  --ink: #263238;
+  --ink-soft: #5B6B77;
+  --amber: #B5772B;
+  --amber-soft: #E8CBA0;
+  --error: #B03A2E;
+  --error-bg: #F6E1DE;
+  --solved: #3A7D5C;
+  --solved-bg: #DDEFE5;
+  --card: #FFFFFF;
+  --radius: 10px;
+  font-size: 16px;
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background:
+    repeating-linear-gradient(0deg, var(--paper-line) 0 1px, transparent 1px 32px),
+    repeating-linear-gradient(90deg, var(--paper-line) 0 1px, transparent 1px 32px),
+    var(--paper);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  overscroll-behavior: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: max(14px, env(safe-area-inset-top)) 16px 12px;
+  position: sticky;
+  top: 0;
+  background: rgba(238, 242, 246, 0.92);
+  backdrop-filter: blur(6px);
+  z-index: 10;
+  border-bottom: 1px solid var(--paper-line);
+}
+
+.topbar h1 {
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin: 0;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--paper-line);
+  background: var(--card);
+  color: var(--ink);
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.icon-btn:active { background: var(--amber-soft); }
+
+.view { padding: 12px 16px 40px; max-width: 640px; margin: 0 auto; }
+.view[hidden] { display: none; }
+
+.subtitle {
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+  margin: 4px 0 18px;
+  line-height: 1.4;
+}
+
+.diff-group { margin-bottom: 22px; }
+.diff-group h2 {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-soft);
+  margin: 0 0 8px 2px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.diff-group h2::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--paper-line);
+}
+
+.puzzle-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+}
+
+.puzzle-tile {
+  background: var(--card);
+  border: 1px solid var(--paper-line);
+  border-radius: var(--radius);
+  padding: 12px 10px;
+  text-align: left;
+  font-family: inherit;
+  color: var(--ink);
+  position: relative;
+  box-shadow: 0 1px 2px rgba(38,50,56,0.06);
+}
+.puzzle-tile:active { transform: translateY(1px); }
+.puzzle-tile .tile-id {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+}
+.puzzle-tile .tile-size {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-top: 2px;
+}
+.puzzle-tile .tile-meta {
+  font-size: 0.7rem;
+  color: var(--ink-soft);
+  margin-top: 6px;
+}
+.puzzle-tile.solved::before {
+  content: "\2713";
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  color: var(--solved);
+  font-weight: 700;
+}
+
+/* Play view */
+.play-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.stat #timer {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 1rem;
+  color: var(--ink-soft);
+}
+.toolbar-actions { display: flex; gap: 8px; }
+
+.chip-btn {
+  border: 1px solid var(--paper-line);
+  background: var(--card);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.82rem;
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+.chip-btn:active { background: var(--amber-soft); }
+.chip-btn.wide { width: 100%; margin-top: 10px; }
+
+#board-wrap {
+  position: relative;
+  margin: 0 auto;
+  touch-action: none;
+}
+
+#trace-svg {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+#board {
+  display: grid;
+  position: relative;
+  border: 2px solid var(--ink);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--paper);
+}
+
+.cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--paper-line);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--card);
+}
+.cell.blocked {
+  background: transparent;
+  border-color: transparent;
+}
+.cell.given {
+  color: var(--amber);
+  background: #FBF3E8;
+  font-weight: 800;
+}
+.cell.filled { color: var(--ink); }
+.cell.selected {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+  z-index: 2;
+}
+.cell.endpoint::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  border: 1.5px dashed var(--amber);
+}
+.cell.error {
+  background: var(--error-bg);
+  color: var(--error);
+}
+.cell.error.given { background: var(--error-bg); color: var(--error); }
+
+.status-banner {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: center;
+}
+.status-banner.solved {
+  background: var(--solved-bg);
+  color: var(--solved);
+}
+.status-banner[hidden] { display: none; }
+
+/* Numpad overlay */
+.numpad-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(38,50,56,0.35);
+  display: flex;
+  align-items: flex-end;
+  z-index: 30;
+}
+.numpad-overlay[hidden] { display: none; }
+.numpad-sheet {
+  background: var(--paper);
+  width: 100%;
+  border-radius: 16px 16px 0 0;
+  padding: 16px 16px max(16px, env(safe-area-inset-bottom));
+  max-width: 640px;
+  margin: 0 auto;
+}
+.numpad-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+.numpad-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+.numpad-grid button {
+  padding: 12px 0;
+  border-radius: 8px;
+  border: 1px solid var(--paper-line);
+  background: var(--card);
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-weight: 700;
+  color: var(--ink);
+}
+.numpad-grid button:active,
+.numpad-grid button.used { background: var(--amber-soft); color: var(--amber); }
+
+.info-body p {
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--ink);
+  margin: 0 0 12px;
+}

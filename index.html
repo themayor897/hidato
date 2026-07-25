@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#EEF2F6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Hidato">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="manifest" href="manifest.json">
+<title>Hidato</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <button id="btn-home" class="icon-btn" aria-label="Home" hidden>&#8592;</button>
+  <h1 id="app-title">Hidato</h1>
+  <button id="btn-info" class="icon-btn" aria-label="How to play">?</button>
+</header>
+
+<main id="view-list" class="view">
+  <p class="subtitle">Fill the grid so consecutive numbers touch &mdash; every puzzle here has exactly one solution.</p>
+  <div id="difficulty-groups"></div>
+</main>
+
+<main id="view-play" class="view" hidden>
+  <div class="play-toolbar">
+    <div class="stat"><span id="timer">0:00</span></div>
+    <div class="toolbar-actions">
+      <button id="btn-hint" class="chip-btn">Hint</button>
+      <button id="btn-undo" class="chip-btn">Undo</button>
+      <button id="btn-clear" class="chip-btn">Clear</button>
+    </div>
+  </div>
+
+  <div id="board-wrap">
+    <svg id="trace-svg"></svg>
+    <div id="board"></div>
+  </div>
+
+  <div id="status-banner" class="status-banner" hidden></div>
+</main>
+
+<div id="numpad-overlay" class="numpad-overlay" hidden>
+  <div class="numpad-sheet">
+    <div class="numpad-header">
+      <span id="numpad-label">Enter number</span>
+      <button id="numpad-close" class="icon-btn" aria-label="Close">&times;</button>
+    </div>
+    <div id="numpad-grid" class="numpad-grid"></div>
+    <button id="numpad-erase" class="chip-btn wide">Erase cell</button>
+  </div>
+</div>
+
+<div id="info-overlay" class="numpad-overlay" hidden>
+  <div class="numpad-sheet">
+    <div class="numpad-header">
+      <span>How to play</span>
+      <button id="info-close" class="icon-btn" aria-label="Close">&times;</button>
+    </div>
+    <div class="info-body">
+      <p><strong>Goal.</strong> Fill every cell with consecutive numbers, from 1 to the last cell, so that each number is adjacent (including diagonally) to the next.</p>
+      <p><strong>Ink-marked cells</strong> are givens &mdash; fixed clues you can't change.</p>
+      <p><strong>Drag</strong> from any filled number across empty neighboring cells to extend the chain automatically. Drag back a step to retract.</p>
+      <p><strong>Tap</strong> an empty cell to enter a specific number by hand.</p>
+      <p>Red highlights mean two touching numbers aren't consecutive, or a number's used twice. Fix those to finish.</p>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

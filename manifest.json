@@ -1,0 +1,15 @@
+{
+  "name": "Hidato",
+  "short_name": "Hidato",
+  "description": "Offline number-chain puzzles with guaranteed unique solutions",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#EEF2F6",
+  "theme_color": "#EEF2F6",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
