@@ -3,7 +3,13 @@
 
   const els = {
     home: document.getElementById("btn-home"),
-    info: document.getElementById("btn-info"),
+    settingsBtn: document.getElementById("btn-settings"),
+    settingsOverlay: document.getElementById("settings-overlay"),
+    settingsClose: document.getElementById("settings-close"),
+    settingsHowto: document.getElementById("settings-howto"),
+    settingsUpdate: document.getElementById("settings-update"),
+    settingsUpdateLabel: document.getElementById("settings-update-label"),
+    darkModeToggle: document.getElementById("dark-mode-toggle"),
     infoOverlay: document.getElementById("info-overlay"),
     infoClose: document.getElementById("info-close"),
     title: document.getElementById("app-title"),
@@ -312,7 +318,7 @@
       const poly = document.createElementNS(ns, "polyline");
       poly.setAttribute("points", pts);
       poly.setAttribute("fill", "none");
-      poly.setAttribute("stroke", "#B5772B");
+      poly.style.stroke = "var(--amber)";
       poly.setAttribute("stroke-width", Math.max(2, cellSize * 0.06));
       poly.setAttribute("stroke-linecap", "round");
       poly.setAttribute("stroke-linejoin", "round");
@@ -350,7 +356,7 @@
     poly.id = "live-trace-line";
     poly.setAttribute("points", points.join(" "));
     poly.setAttribute("fill", "none");
-    poly.setAttribute("stroke", "#B5772B");
+    poly.style.stroke = "var(--amber)";
     poly.setAttribute("stroke-width", Math.max(3, cellSize * 0.09));
     poly.setAttribute("stroke-linecap", "round");
     poly.setAttribute("stroke-linejoin", "round");
@@ -597,6 +603,51 @@
     els.banner.textContent = "Solved in " + fmtTime(elapsed) + " \u2014 nice work.";
   }
 
+  // ---------- Settings ----------
+
+  const DARK_MODE_KEY = "hidato_dark_mode";
+
+  function systemPrefersDark() {
+    return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  }
+
+  function setDarkMode(isDark, persist) {
+    document.documentElement.classList.toggle("dark", isDark);
+    els.darkModeToggle.checked = isDark;
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", isDark ? "#1B1F24" : "#EEF2F6");
+    if (persist) {
+      try { localStorage.setItem(DARK_MODE_KEY, isDark ? "1" : "0"); } catch (e) {}
+    }
+  }
+
+  function initDarkMode() {
+    let stored = null;
+    try {
+      const raw = localStorage.getItem(DARK_MODE_KEY);
+      stored = raw === null ? null : raw === "1";
+    } catch (e) {}
+    setDarkMode(stored === null ? systemPrefersDark() : stored, false);
+  }
+
+  function checkForUpdate() {
+    els.settingsUpdate.disabled = true;
+    els.settingsUpdateLabel.textContent = "Updating…";
+    Promise.resolve()
+      .then(async () => {
+        if ("serviceWorker" in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          for (const r of regs) await r.unregister();
+        }
+        if ("caches" in window) {
+          const names = await caches.keys();
+          for (const n of names) await caches.delete(n);
+        }
+      })
+      .catch(() => {})
+      .then(() => { location.reload(); });
+  }
+
   // ---------- Wiring ----------
 
   els.home.addEventListener("click", () => {
@@ -617,11 +668,23 @@
     clearActive(diff);
     generateAndOpen(diff, null);
   });
-  els.info.addEventListener("click", () => { els.infoOverlay.hidden = false; });
+  els.settingsBtn.addEventListener("click", () => { els.settingsOverlay.hidden = false; });
+  els.settingsClose.addEventListener("click", () => { els.settingsOverlay.hidden = true; });
+  els.settingsOverlay.addEventListener("click", (e) => {
+    if (e.target === els.settingsOverlay) els.settingsOverlay.hidden = true;
+  });
+  els.settingsHowto.addEventListener("click", () => {
+    els.settingsOverlay.hidden = true;
+    els.infoOverlay.hidden = false;
+  });
   els.infoClose.addEventListener("click", () => { els.infoOverlay.hidden = true; });
   els.infoOverlay.addEventListener("click", (e) => {
     if (e.target === els.infoOverlay) els.infoOverlay.hidden = true;
   });
+  els.darkModeToggle.addEventListener("change", () => {
+    setDarkMode(els.darkModeToggle.checked, true);
+  });
+  els.settingsUpdate.addEventListener("click", checkForUpdate);
 
   window.addEventListener("resize", () => {
     if (current && !els.viewPlay.hidden) {
@@ -632,6 +695,7 @@
 
   // ---------- Boot ----------
 
+  initDarkMode();
   renderList();
 
   if ("serviceWorker" in navigator) {

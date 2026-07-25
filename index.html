@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#EEF2F6">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -17,7 +18,7 @@
 <header class="topbar">
   <button id="btn-home" class="icon-btn" aria-label="Home" hidden>&#8592;</button>
   <h1 id="app-title">Hidato</h1>
-  <button id="btn-info" class="icon-btn" aria-label="How to play">?</button>
+  <button id="btn-settings" class="icon-btn" aria-label="Settings">&#9881;</button>
 </header>
 
 <main id="view-list" class="view">
@@ -55,6 +56,32 @@
     </div>
     <div id="numpad-grid" class="numpad-grid"></div>
     <button id="numpad-erase" class="chip-btn wide">Erase cell</button>
+  </div>
+</div>
+
+<div id="settings-overlay" class="numpad-overlay" hidden>
+  <div class="numpad-sheet">
+    <div class="numpad-header">
+      <span>Settings</span>
+      <button id="settings-close" class="icon-btn" aria-label="Close">&times;</button>
+    </div>
+    <div class="settings-body">
+      <button id="settings-howto" class="settings-row">
+        <span>How to play</span>
+        <span class="settings-row-arrow">&rsaquo;</span>
+      </button>
+      <div class="settings-row">
+        <span>Dark mode</span>
+        <label class="switch">
+          <input type="checkbox" id="dark-mode-toggle">
+          <span class="switch-track"><span class="switch-thumb"></span></span>
+        </label>
+      </div>
+      <button id="settings-update" class="settings-row">
+        <span id="settings-update-label">Update app</span>
+        <span class="settings-row-arrow">&rsaquo;</span>
+      </button>
+    </div>
   </div>
 </div>
 
