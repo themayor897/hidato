@@ -21,7 +21,7 @@
 </header>
 
 <main id="view-list" class="view">
-  <p class="subtitle">Fill the grid so consecutive numbers touch &mdash; every puzzle here has exactly one solution.</p>
+  <p class="subtitle">Fill the grid so consecutive numbers touch &mdash; every puzzle is freshly generated with exactly one solution.</p>
   <div id="difficulty-groups"></div>
 </main>
 
@@ -32,6 +32,7 @@
       <button id="btn-hint" class="chip-btn">Hint</button>
       <button id="btn-undo" class="chip-btn">Undo</button>
       <button id="btn-clear" class="chip-btn">Clear</button>
+      <button id="btn-new" class="chip-btn">New</button>
     </div>
   </div>
 
@@ -70,6 +71,7 @@
   </div>
 </div>
 
+<script src="generator.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

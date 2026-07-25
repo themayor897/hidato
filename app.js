@@ -23,11 +23,11 @@
     numpadLabel: document.getElementById("numpad-label"),
     numpadClose: document.getElementById("numpad-close"),
     numpadErase: document.getElementById("numpad-erase"),
+    newPuzzle: document.getElementById("btn-new"),
   };
 
   const DIFF_ORDER = ["Easy", "Medium", "Hard", "Expert"];
 
-  let PUZZLES = [];
   let current = null;      // current puzzle object
   let filled = new Map();  // "r,c" -> value (givens + player fills)
   let blockedSet = new Set();
@@ -55,28 +55,41 @@
   function key(r, c) { return r + "," + c; }
   function parseKey(k) { const [r, c] = k.split(",").map(Number); return { r, c }; }
 
-  function progressKey(id) { return "hidato_progress_" + id; }
+  function activeKey(diff) { return "hidato_active_" + diff; }
+  function bestKey(diff) { return "hidato_best_" + diff; }
 
-  function loadProgress(id) {
+  function loadActive(diff) {
     try {
-      const raw = localStorage.getItem(progressKey(id));
+      const raw = localStorage.getItem(activeKey(diff));
       return raw ? JSON.parse(raw) : null;
     } catch (e) { return null; }
   }
 
-  function saveProgress() {
-    if (!current) return;
+  function clearActive(diff) {
+    try { localStorage.removeItem(activeKey(diff)); } catch (e) {}
+  }
+
+  function saveActive() {
+    if (!current || solved) return;
     const data = {
+      puzzle: current,
       filled: Array.from(filled.entries()).filter(([k]) => !givenSet.has(k)),
       elapsed,
-      completed: solved,
-      bestTime: (loadProgress(current.id) || {}).bestTime || null,
     };
-    if (solved) {
-      const prevBest = (loadProgress(current.id) || {}).bestTime;
-      data.bestTime = prevBest ? Math.min(prevBest, elapsed) : elapsed;
-    }
-    try { localStorage.setItem(progressKey(current.id), JSON.stringify(data)); } catch (e) {}
+    try { localStorage.setItem(activeKey(current.difficulty), JSON.stringify(data)); } catch (e) {}
+  }
+
+  function loadBest(diff) {
+    try {
+      const raw = localStorage.getItem(bestKey(diff));
+      return raw ? Number(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  function saveBest(diff, time) {
+    const prev = loadBest(diff);
+    const best = prev ? Math.min(prev, time) : time;
+    try { localStorage.setItem(bestKey(diff), String(best)); } catch (e) {}
   }
 
   function fmtTime(sec) {
@@ -95,37 +108,55 @@
     stopTimer();
 
     els.groups.innerHTML = "";
+    const group = document.createElement("div");
+    group.className = "diff-group";
+    const grid = document.createElement("div");
+    grid.className = "puzzle-grid";
+
     DIFF_ORDER.forEach((diff) => {
-      const items = PUZZLES.filter((p) => p.difficulty === diff);
-      if (!items.length) return;
-      const group = document.createElement("div");
-      group.className = "diff-group";
-      const h2 = document.createElement("h2");
-      h2.textContent = diff;
-      group.appendChild(h2);
-      const grid = document.createElement("div");
-      grid.className = "puzzle-grid";
-      items.forEach((p, idx) => {
-        const prog = loadProgress(p.id);
-        const tile = document.createElement("button");
-        tile.className = "puzzle-tile" + (prog && prog.completed ? " solved" : "");
-        tile.innerHTML =
-          '<div class="tile-id">' + diff + " " + (idx + 1) + "</div>" +
-          '<div class="tile-size">' + p.rows + "&times;" + p.cols + "</div>" +
-          '<div class="tile-meta">' + p.n_cells + " cells &middot; " + p.n_givens + " givens" +
-          (prog && prog.bestTime ? " &middot; best " + fmtTime(prog.bestTime) : "") +
-          "</div>";
-        tile.addEventListener("click", () => openPuzzle(p));
-        grid.appendChild(tile);
+      const meta = HidatoGen.DIFFS[diff];
+      const active = loadActive(diff);
+      const best = loadBest(diff);
+      const tile = document.createElement("button");
+      tile.className = "puzzle-tile";
+      tile.innerHTML =
+        '<div class="tile-id">' + diff + "</div>" +
+        '<div class="tile-size">' + meta.rows + "&times;" + meta.cols + "</div>" +
+        '<div class="tile-meta">' +
+        (active ? "In progress &middot; " + fmtTime(active.elapsed || 0) : "Tap for a new puzzle") +
+        (best ? " &middot; best " + fmtTime(best) : "") +
+        "</div>";
+      tile.addEventListener("click", () => {
+        if (active) {
+          openPuzzle(active.puzzle, active);
+        } else {
+          generateAndOpen(diff, tile);
+        }
       });
-      group.appendChild(grid);
-      els.groups.appendChild(group);
+      grid.appendChild(tile);
     });
+    group.appendChild(grid);
+    els.groups.appendChild(group);
+  }
+
+  function generateAndOpen(diff, tileEl) {
+    if (tileEl) {
+      tileEl.disabled = true;
+      tileEl.innerHTML =
+        '<div class="tile-id">' + diff + "</div>" +
+        '<div class="tile-size">Generating&hellip;</div>';
+    }
+    // Yield a frame so the "Generating..." state paints before the
+    // (synchronous) puzzle search runs.
+    setTimeout(() => {
+      const puzzle = HidatoGen.generate(diff);
+      openPuzzle(puzzle, null);
+    }, 20);
   }
 
   // ---------- Play view ----------
 
-  function openPuzzle(p) {
+  function openPuzzle(p, resumeData) {
     current = p;
     N = p.n_cells;
     blockedSet = new Set(p.blocked.map((b) => key(b.r, b.c)));
@@ -133,19 +164,15 @@
     filled = new Map();
     p.givens.forEach((g) => filled.set(key(g.r, g.c), g.v));
 
-    const prog = loadProgress(p.id);
     elapsed = 0;
     solved = false;
-    if (prog) {
-      elapsed = prog.completed ? (prog.bestTime || 0) : (prog.elapsed || 0);
-      solved = !!prog.completed;
-      if (prog.filled) {
-        prog.filled.forEach(([k, v]) => filled.set(k, v));
-      }
+    if (resumeData) {
+      elapsed = resumeData.elapsed || 0;
+      (resumeData.filled || []).forEach(([k, v]) => filled.set(k, v));
     }
     undoStack = [];
 
-    els.title.textContent = current.difficulty + " " + (current.id.split("-")[1] || "");
+    els.title.textContent = current.difficulty;
     els.home.hidden = false;
     els.viewList.hidden = true;
     els.viewPlay.hidden = false;
@@ -153,11 +180,7 @@
 
     buildBoard();
     renderBoard();
-    if (solved) {
-      showSolvedBanner();
-    } else {
-      startTimer();
-    }
+    startTimer();
   }
 
   function buildBoard() {
@@ -389,7 +412,7 @@
         undoStack.pop();
       }
     } else {
-      saveProgress();
+      saveActive();
       checkWin();
     }
     renderBoard();
@@ -405,7 +428,7 @@
     filled = undoStack.pop();
     solved = false;
     renderBoard();
-    saveProgress();
+    saveActive();
   }
 
   function clearProgress() {
@@ -419,7 +442,7 @@
     els.banner.hidden = true;
     startTimer();
     renderBoard();
-    saveProgress();
+    saveActive();
   }
 
   function giveHint() {
@@ -432,7 +455,7 @@
       if (filled.get(k) !== v) {
         filled.set(k, v);
         renderBoard();
-        saveProgress();
+        saveActive();
         checkWin();
         return;
       }
@@ -461,7 +484,7 @@
         filled.set(k, n);
         closeNumpad();
         renderBoard();
-        saveProgress();
+        saveActive();
         checkWin();
       });
       els.numpadGrid.appendChild(btn);
@@ -484,7 +507,7 @@
     filled.delete(activeNumpadCell);
     closeNumpad();
     renderBoard();
-    saveProgress();
+    saveActive();
   });
 
   // ---------- Timer / win ----------
@@ -511,7 +534,8 @@
     if (values.size !== N) return;
     solved = true;
     stopTimer();
-    saveProgress();
+    clearActive(current.difficulty);
+    saveBest(current.difficulty, elapsed);
     showSolvedBanner();
   }
 
@@ -524,6 +548,7 @@
   // ---------- Wiring ----------
 
   els.home.addEventListener("click", () => {
+    saveActive();
     document.removeEventListener("pointermove", onPointerMove);
     document.removeEventListener("pointerup", onPointerUp);
     renderList();
@@ -531,6 +556,13 @@
   els.hint.addEventListener("click", giveHint);
   els.undo.addEventListener("click", undo);
   els.clear.addEventListener("click", clearProgress);
+  els.newPuzzle.addEventListener("click", () => {
+    if (!current) return;
+    if (!confirm("Start a new " + current.difficulty + " puzzle? Current progress will be lost.")) return;
+    const diff = current.difficulty;
+    clearActive(diff);
+    generateAndOpen(diff, null);
+  });
   els.info.addEventListener("click", () => { els.infoOverlay.hidden = false; });
   els.infoClose.addEventListener("click", () => { els.infoOverlay.hidden = true; });
   els.infoOverlay.addEventListener("click", (e) => {
@@ -546,12 +578,7 @@
 
   // ---------- Boot ----------
 
-  fetch("puzzles.json")
-    .then((r) => r.json())
-    .then((data) => { PUZZLES = data; renderList(); })
-    .catch(() => {
-      els.groups.innerHTML = '<p class="subtitle">Couldn\'t load puzzles. If this is the first launch, make sure you have a connection once so the app can cache its files offline.</p>';
-    });
+  renderList();
 
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
