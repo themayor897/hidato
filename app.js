@@ -53,6 +53,7 @@
     path: [],         // every head position visited this gesture, path[0] = start
     newlyFilled: null, // Set of keys created (not bridged) during this gesture
     lastKey: null,
+    lastPointerLocal: null, // raw pointer position in board-local px, for the live trace tip
   };
 
   function key(r, c) { return r + "," + c; }
@@ -318,6 +319,42 @@
       poly.setAttribute("opacity", "0.55");
       els.svg.appendChild(poly);
     });
+
+    renderLiveTrace();
+  }
+
+  function toLocalPoint(clientX, clientY) {
+    const rect = els.boardWrap.getBoundingClientRect();
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  }
+
+  // Live line for the in-progress drag gesture: starts at the center of the
+  // cell the drag began on and follows the raw pointer position (not
+  // snapped to a cell) through the centers of every cell filled so far.
+  // Separate from drawTrace's persisted per-number trace so it can be
+  // updated on every pointermove without recomputing errors/board state.
+  function renderLiveTrace() {
+    const existing = els.svg.querySelector("#live-trace-line");
+    if (existing) existing.remove();
+
+    if (!drag.active || drag.headKey === null || !drag.lastPointerLocal) return;
+
+    const ns = "http://www.w3.org/2000/svg";
+    const points = drag.path.map((k) => {
+      const { r, c } = parseKey(k);
+      return (c * cellSize + cellSize / 2) + "," + (r * cellSize + cellSize / 2);
+    });
+    points.push(drag.lastPointerLocal.x + "," + drag.lastPointerLocal.y);
+
+    const poly = document.createElementNS(ns, "polyline");
+    poly.id = "live-trace-line";
+    poly.setAttribute("points", points.join(" "));
+    poly.setAttribute("fill", "none");
+    poly.setAttribute("stroke", "#B5772B");
+    poly.setAttribute("stroke-width", Math.max(3, cellSize * 0.09));
+    poly.setAttribute("stroke-linecap", "round");
+    poly.setAttribute("stroke-linejoin", "round");
+    els.svg.appendChild(poly);
   }
 
   // ---------- Interaction ----------
@@ -349,6 +386,7 @@
       drag.headKey = null;
       drag.headValue = null;
     }
+    drag.lastPointerLocal = toLocalPoint(e.clientX, e.clientY);
     renderBoard();
   }
 
@@ -362,6 +400,10 @@
 
   function onPointerMove(e) {
     if (!drag.active || solved) return;
+
+    drag.lastPointerLocal = toLocalPoint(e.clientX, e.clientY);
+    renderLiveTrace(); // cheap: keep the tip following the pointer every frame
+
     const k = cellFromPoint(e.clientX, e.clientY);
     if (!k || k === drag.lastKey) return;
     drag.moved = true;
