@@ -26,7 +26,7 @@
     newPuzzle: document.getElementById("btn-new"),
   };
 
-  const DIFF_ORDER = ["Easy", "Medium", "Hard", "Expert"];
+  const DIFF_ORDER = ["Easy", "Normal", "Hard", "Very Hard", "Ultra"];
 
   let current = null;      // current puzzle object
   let filled = new Map();  // "r,c" -> value (givens + player fills)
@@ -188,10 +188,12 @@
     cellEls = new Map();
     const rows = current.rows, cols = current.cols;
 
+    // Size purely off available width so cells stay legible and touch-friendly;
+    // taller/rectangular grids simply extend the board (and page) downward
+    // instead of being squeezed to fit one screen's height.
     const wrapWidth = Math.min(window.innerWidth - 32, 520);
-    const wrapHeight = window.innerHeight - 230;
-    cellSize = Math.floor(Math.min(wrapWidth / cols, wrapHeight / rows, 84));
-    cellSize = Math.max(cellSize, 30);
+    cellSize = Math.floor(Math.min(wrapWidth / cols, 84));
+    cellSize = Math.max(cellSize, 26);
 
     els.board.style.gridTemplateColumns = "repeat(" + cols + ", " + cellSize + "px)";
     els.board.style.gridTemplateRows = "repeat(" + rows + ", " + cellSize + "px)";

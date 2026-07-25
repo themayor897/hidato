@@ -2,10 +2,11 @@
   "use strict";
 
   const DIFFS = {
-    Easy:   { rows: 5, cols: 5, blocked: 0 },
-    Medium: { rows: 6, cols: 6, blocked: 0 },
-    Hard:   { rows: 7, cols: 7, blocked: 0 },
-    Expert: { rows: 8, cols: 8, blocked: 12 },
+    Easy:        { rows: 5,  cols: 5,  blocked: 0 },
+    Normal:      { rows: 7,  cols: 7,  blocked: 0 },
+    Hard:        { rows: 9,  cols: 9,  blocked: 14 },
+    "Very Hard": { rows: 11, cols: 9,  blocked: 17 },
+    Ultra:       { rows: 12, cols: 10, blocked: 20 },
   };
 
   function key(r, c) { return r + "," + c; }
@@ -221,7 +222,10 @@
     path.forEach((k, i) => givenMap.set(k, i + 1));
 
     const removable = shuffle(path.slice(1, -1)); // keep endpoints 1 and N as permanent clues
-    const deadline = Date.now() + 2000;
+    // Larger boards need more removal attempts to approach a minimal clue
+    // set, so scale the time budget with cell count rather than capping
+    // every size at the same wall-clock deadline.
+    const deadline = Date.now() + 1000 + N * 20;
     for (const k of removable) {
       if (Date.now() > deadline) break;
       const v = givenMap.get(k);
