@@ -2,10 +2,10 @@
   "use strict";
 
   const DIFFS = {
-    Easy:   { rows: 5, cols: 5, blocked: 0,  givenRatio: [0.42, 0.48] },
-    Medium: { rows: 6, cols: 6, blocked: 0,  givenRatio: [0.42, 0.48] },
-    Hard:   { rows: 7, cols: 7, blocked: 0,  givenRatio: [0.42, 0.48] },
-    Expert: { rows: 8, cols: 8, blocked: 12, givenRatio: [0.42, 0.48] },
+    Easy:   { rows: 5, cols: 5, blocked: 0 },
+    Medium: { rows: 6, cols: 6, blocked: 0 },
+    Hard:   { rows: 7, cols: 7, blocked: 0 },
+    Expert: { rows: 8, cols: 8, blocked: 12 },
   };
 
   function key(r, c) { return r + "," + c; }
@@ -207,27 +207,26 @@
   }
 
   // Builds one candidate: a random Hamiltonian path, then greedily strips
-  // clues from a fully-revealed board, keeping each removal only if the
-  // puzzle stays uniquely solvable. Starting full and removing lands near
-  // the target ratio far more reliably than revealing clues forward from
-  // nothing, since king-move adjacency leaves an open board with many
-  // alternate Hamiltonian paths until heavily constrained.
+  // clues from a fully-revealed board down to a locally-minimal unique set,
+  // keeping each removal only if the puzzle stays uniquely solvable.
+  // Starting full and removing (rather than revealing clues forward from
+  // nothing) is what lets this reach a sparse clue set at all, since
+  // king-move adjacency leaves an open board with many alternate
+  // Hamiltonian paths until heavily constrained.
   function attemptGenerate(cfg) {
     const { path, blocked } = generatePath(cfg.rows, cfg.cols, cfg.blocked);
     const N = path.length;
-    const ratio = cfg.givenRatio[0] + Math.random() * (cfg.givenRatio[1] - cfg.givenRatio[0]);
-    const targetGivens = Math.max(2, Math.round(N * ratio));
 
     const givenMap = new Map();
     path.forEach((k, i) => givenMap.set(k, i + 1));
 
     const removable = shuffle(path.slice(1, -1)); // keep endpoints 1 and N as permanent clues
-    const deadline = Date.now() + 1200;
+    const deadline = Date.now() + 2000;
     for (const k of removable) {
-      if (givenMap.size <= targetGivens || Date.now() > deadline) break;
+      if (Date.now() > deadline) break;
       const v = givenMap.get(k);
       givenMap.delete(k);
-      const result = countSolutions(cfg.rows, cfg.cols, blocked, givenMap, N, 2, 200);
+      const result = countSolutions(cfg.rows, cfg.cols, blocked, givenMap, N, 2, 150);
       if (result.count > 1 || result.timedOut) givenMap.set(k, v);
     }
 
@@ -238,17 +237,10 @@
     const cfg = DIFFS[difficulty];
     if (!cfg) throw new Error("Unknown difficulty: " + difficulty);
 
-    // Some random paths are structurally hard to compress (most removals
-    // get rejected). Retry a couple of times and keep the best if the
-    // first attempt lands well above the target ratio.
-    const acceptableRatio = 0.58;
-    let best = attemptGenerate(cfg);
-    for (let i = 0; i < 2 && best.givenMap.size / best.N > acceptableRatio; i++) {
-      const candidate = attemptGenerate(cfg);
-      if (candidate.givenMap.size < best.givenMap.size) best = candidate;
-    }
-
-    const { path, blocked, N, givenMap } = best;
+    // Exhaustive minimal-removal is the expensive part (every clue gets a
+    // solver check), so a single attempt per generate() call keeps this
+    // fast; the deadline inside attemptGenerate still bounds worst case.
+    const { path, blocked, N, givenMap } = attemptGenerate(cfg);
     const blockedList = Array.from(blocked).map((k) => parseKey(k));
     const givensList = Array.from(givenMap.entries()).map(([k, v]) => {
       const { r, c } = parseKey(k);
