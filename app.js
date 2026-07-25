@@ -433,9 +433,12 @@
     if (existingVal === undefined) {
       const nextVal = drag.headValue + step;
       if (nextVal < 1 || nextVal > N) return;
-      let dup = false;
-      filled.forEach((v) => { if (v === nextVal) dup = true; });
-      if (dup) return;
+      let dupKey = null;
+      filled.forEach((v, kk) => { if (v === nextVal) dupKey = kk; });
+      if (dupKey !== null) {
+        if (givenSet.has(dupKey)) return; // can't relocate a fixed clue
+        filled.delete(dupKey);
+      }
       filled.set(k, nextVal);
       drag.newlyFilled.add(k);
       drag.path.push(k);
