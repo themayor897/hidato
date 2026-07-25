@@ -15,8 +15,8 @@
     svg: document.getElementById("trace-svg"),
     timer: document.getElementById("timer"),
     hint: document.getElementById("btn-hint"),
-    undo: document.getElementById("btn-undo"),
-    clear: document.getElementById("btn-clear"),
+    restart: document.getElementById("btn-restart"),
+    erase: document.getElementById("btn-erase"),
     banner: document.getElementById("status-banner"),
     numpadOverlay: document.getElementById("numpad-overlay"),
     numpadGrid: document.getElementById("numpad-grid"),
@@ -35,11 +35,11 @@
   let cellEls = new Map(); // "r,c" -> element
   let cellSize = 0;
   let N = 0;
-  let undoStack = [];
   let timerHandle = null;
   let elapsed = 0;
   let solved = false;
   let activeNumpadCell = null;
+  let eraseMode = false;
 
   let drag = {
     active: false,
@@ -170,7 +170,7 @@
       elapsed = resumeData.elapsed || 0;
       (resumeData.filled || []).forEach(([k, v]) => filled.set(k, v));
     }
-    undoStack = [];
+    setEraseMode(false);
 
     els.title.textContent = current.difficulty;
     els.home.hidden = false;
@@ -322,6 +322,16 @@
     if (solved || drag.active) return;
     const k = e.currentTarget.dataset.key;
     if (!k) return;
+
+    if (eraseMode) {
+      if (filled.has(k) && !givenSet.has(k)) {
+        filled.delete(k);
+        renderBoard();
+        saveActive();
+      }
+      return;
+    }
+
     drag.active = true;
     drag.moved = false;
     drag.startKey = k;
@@ -335,7 +345,6 @@
       drag.headKey = null;
       drag.headValue = null;
     }
-    pushUndoSnapshot();
     renderBoard();
   }
 
@@ -406,13 +415,8 @@
     drag.headKey = null;
     drag.headValue = null;
 
-    if (wasTap && tapKey && !blockedSet.has(tapKey)) {
-      if (!givenSet.has(tapKey)) {
-        openNumpad(tapKey);
-        undoStack.pop(); // no board change happened on a bare tap; discard the snapshot we pre-pushed
-      } else {
-        undoStack.pop();
-      }
+    if (wasTap && tapKey && !blockedSet.has(tapKey) && !givenSet.has(tapKey)) {
+      openNumpad(tapKey);
     } else {
       saveActive();
       checkWin();
@@ -420,22 +424,13 @@
     renderBoard();
   }
 
-  function pushUndoSnapshot() {
-    undoStack.push(new Map(filled));
-    if (undoStack.length > 60) undoStack.shift();
+  function setEraseMode(on) {
+    eraseMode = on;
+    els.erase.classList.toggle("active", eraseMode);
   }
 
-  function undo() {
-    if (!undoStack.length) return;
-    filled = undoStack.pop();
-    solved = false;
-    renderBoard();
-    saveActive();
-  }
-
-  function clearProgress() {
-    if (!confirm("Clear all your entries in this puzzle?")) return;
-    pushUndoSnapshot();
+  function restartPuzzle() {
+    if (!confirm("Restart this puzzle? Your entries will be cleared.")) return;
     const keysToRemove = [];
     filled.forEach((v, k) => { if (!givenSet.has(k)) keysToRemove.push(k); });
     keysToRemove.forEach((k) => filled.delete(k));
@@ -449,7 +444,6 @@
 
   function giveHint() {
     if (solved || !current) return;
-    pushUndoSnapshot();
     const sol = current.solution;
     for (let v = 1; v <= N; v++) {
       const target = sol.find((s) => s.v === v);
@@ -476,7 +470,6 @@
       btn.textContent = n;
       if (used.has(n) && filled.get(k) !== n) btn.classList.add("used");
       btn.addEventListener("click", () => {
-        pushUndoSnapshot();
         // remove n from wherever it currently sits (if anywhere else)
         let existingKeyForN = null;
         filled.forEach((v, kk) => { if (v === n) existingKeyForN = kk; });
@@ -505,7 +498,6 @@
   });
   els.numpadErase.addEventListener("click", () => {
     if (!activeNumpadCell) return;
-    pushUndoSnapshot();
     filled.delete(activeNumpadCell);
     closeNumpad();
     renderBoard();
@@ -556,8 +548,8 @@
     renderList();
   });
   els.hint.addEventListener("click", giveHint);
-  els.undo.addEventListener("click", undo);
-  els.clear.addEventListener("click", clearProgress);
+  els.restart.addEventListener("click", restartPuzzle);
+  els.erase.addEventListener("click", () => setEraseMode(!eraseMode));
   els.newPuzzle.addEventListener("click", () => {
     if (!current) return;
     if (!confirm("Start a new " + current.difficulty + " puzzle? Current progress will be lost.")) return;

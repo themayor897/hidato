@@ -1,4 +1,4 @@
-const CACHE_NAME = "hidato-v2";
+const CACHE_NAME = "hidato-v3";
 const ASSETS = [
   "./",
   "./index.html",

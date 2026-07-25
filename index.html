@@ -28,17 +28,18 @@
 <main id="view-play" class="view" hidden>
   <div class="play-toolbar">
     <div class="stat"><span id="timer">0:00</span></div>
-    <div class="toolbar-actions">
-      <button id="btn-hint" class="chip-btn">Hint</button>
-      <button id="btn-undo" class="chip-btn">Undo</button>
-      <button id="btn-clear" class="chip-btn">Clear</button>
-      <button id="btn-new" class="chip-btn">New</button>
-    </div>
   </div>
 
   <div id="board-wrap">
     <svg id="trace-svg"></svg>
     <div id="board"></div>
+  </div>
+
+  <div class="bottom-toolbar">
+    <button id="btn-restart" class="chip-btn">Restart</button>
+    <button id="btn-erase" class="chip-btn">Erase</button>
+    <button id="btn-new" class="chip-btn">New</button>
+    <button id="btn-hint" class="chip-btn">Hint</button>
   </div>
 
   <div id="status-banner" class="status-banner" hidden></div>

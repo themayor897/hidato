@@ -67,6 +67,7 @@ html, body {
   padding: 0;
 }
 .icon-btn:active { background: var(--amber-soft); }
+.icon-btn[hidden] { display: none; }
 
 .view { padding: 12px 16px 40px; max-width: 640px; margin: 0 auto; }
 .view[hidden] { display: none; }
@@ -97,8 +98,8 @@ html, body {
 }
 
 .puzzle-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 10px;
 }
 
@@ -143,7 +144,7 @@ html, body {
 .play-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   margin-bottom: 12px;
 }
 .stat #timer {
@@ -151,7 +152,16 @@ html, body {
   font-size: 1rem;
   color: var(--ink-soft);
 }
-.toolbar-actions { display: flex; gap: 8px; }
+
+.bottom-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px auto 0;
+  max-width: 520px;
+}
 
 .chip-btn {
   border: 1px solid var(--paper-line);
@@ -165,6 +175,11 @@ html, body {
 }
 .chip-btn:active { background: var(--amber-soft); }
 .chip-btn.wide { width: 100%; margin-top: 10px; }
+.chip-btn.active {
+  background: var(--amber);
+  border-color: var(--amber);
+  color: #fff;
+}
 
 #board-wrap {
   position: relative;
