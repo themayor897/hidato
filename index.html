@@ -37,6 +37,8 @@
 
   <div class="bottom-toolbar">
     <button id="btn-restart" class="chip-btn">Restart</button>
+    <button id="btn-dir-up" class="chip-btn active" aria-pressed="true">&uarr; Up</button>
+    <button id="btn-dir-down" class="chip-btn" aria-pressed="false">&darr; Down</button>
     <button id="btn-erase" class="chip-btn">Erase</button>
     <button id="btn-new" class="chip-btn">New</button>
     <button id="btn-hint" class="chip-btn">Hint</button>
@@ -65,7 +67,7 @@
     <div class="info-body">
       <p><strong>Goal.</strong> Fill every cell with consecutive numbers, from 1 to the last cell, so that each number is adjacent (including diagonally) to the next.</p>
       <p><strong>Ink-marked cells</strong> are givens &mdash; fixed clues you can't change.</p>
-      <p><strong>Drag</strong> from any filled number across empty neighboring cells to extend the chain automatically. Drag back a step to retract.</p>
+      <p><strong>Drag</strong> from any filled number across empty neighboring cells to extend the chain automatically. Drag back a step to retract. The <strong>Up</strong>/<strong>Down</strong> toggle controls whether dragging counts forward or backward from that number.</p>
       <p><strong>Tap</strong> an empty cell to enter a specific number by hand.</p>
       <p>Red highlights mean two touching numbers aren't consecutive, or a number's used twice. Fix those to finish.</p>
     </div>

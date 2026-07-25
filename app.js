@@ -16,6 +16,8 @@
     timer: document.getElementById("timer"),
     hint: document.getElementById("btn-hint"),
     restart: document.getElementById("btn-restart"),
+    dirUp: document.getElementById("btn-dir-up"),
+    dirDown: document.getElementById("btn-dir-down"),
     erase: document.getElementById("btn-erase"),
     banner: document.getElementById("status-banner"),
     numpadOverlay: document.getElementById("numpad-overlay"),
@@ -40,6 +42,7 @@
   let solved = false;
   let activeNumpadCell = null;
   let eraseMode = false;
+  let dragDirection = "up"; // "up" fills head+1 when dragging, "down" fills head-1
 
   let drag = {
     active: false,
@@ -171,6 +174,7 @@
       (resumeData.filled || []).forEach(([k, v]) => filled.set(k, v));
     }
     setEraseMode(false);
+    setDragDirection("up");
 
     els.title.textContent = current.difficulty;
     els.home.hidden = false;
@@ -382,10 +386,11 @@
     if (!isAdjacent(drag.headKey, k)) return;
     if (blockedSet.has(k)) return;
 
+    const step = dragDirection === "down" ? -1 : 1;
     const existingVal = filled.get(k);
     if (existingVal === undefined) {
-      const nextVal = drag.headValue + 1;
-      if (nextVal > N) return;
+      const nextVal = drag.headValue + step;
+      if (nextVal < 1 || nextVal > N) return;
       let dup = false;
       filled.forEach((v) => { if (v === nextVal) dup = true; });
       if (dup) return;
@@ -395,7 +400,7 @@
       drag.headKey = k;
       drag.headValue = nextVal;
       renderBoard();
-    } else if (existingVal === drag.headValue + 1) {
+    } else if (existingVal === drag.headValue + step) {
       // bridge into an already-known number (given or previously filled)
       drag.path.push(k);
       drag.headKey = k;
@@ -427,6 +432,14 @@
   function setEraseMode(on) {
     eraseMode = on;
     els.erase.classList.toggle("active", eraseMode);
+  }
+
+  function setDragDirection(dir) {
+    dragDirection = dir;
+    els.dirUp.classList.toggle("active", dir === "up");
+    els.dirUp.setAttribute("aria-pressed", String(dir === "up"));
+    els.dirDown.classList.toggle("active", dir === "down");
+    els.dirDown.setAttribute("aria-pressed", String(dir === "down"));
   }
 
   function restartPuzzle() {
@@ -549,6 +562,8 @@
   });
   els.hint.addEventListener("click", giveHint);
   els.restart.addEventListener("click", restartPuzzle);
+  els.dirUp.addEventListener("click", () => setDragDirection("up"));
+  els.dirDown.addEventListener("click", () => setDragDirection("down"));
   els.erase.addEventListener("click", () => setEraseMode(!eraseMode));
   els.newPuzzle.addEventListener("click", () => {
     if (!current) return;
