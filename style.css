@@ -230,7 +230,7 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--paper-line);
+  border: 1px solid var(--ink-soft);
   font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   font-weight: 600;
   color: var(--ink);

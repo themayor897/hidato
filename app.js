@@ -64,8 +64,8 @@
 
   const SQRT3 = Math.sqrt(3);
 
-  function key(q, r) { return q + "," + r; }
-  function parseKey(k) { const [q, r] = k.split(",").map(Number); return { q, r }; }
+  function key(col, row) { return col + "," + row; }
+  function parseKey(k) { const [col, row] = k.split(",").map(Number); return { col, row }; }
 
   function activeKey(diff) { return "hidato_active_" + diff; }
   function bestKey(diff) { return "hidato_best_" + diff; }
@@ -75,9 +75,9 @@
       const raw = localStorage.getItem(activeKey(diff));
       if (!raw) return null;
       const data = JSON.parse(raw);
-      // Ignore saves from the old square-grid format (no `radius` field) --
-      // they're not resumable on the hex board.
-      if (!data || !data.puzzle || typeof data.puzzle.radius !== "number") return null;
+      // Ignore saves from an older puzzle format -- they're not resumable
+      // as-is (different coordinate system / board shape).
+      if (!data || !data.puzzle || data.puzzle.format !== HidatoGen.FORMAT) return null;
       return data;
     } catch (e) { return null; }
   }
@@ -176,10 +176,10 @@
   function openPuzzle(p, resumeData) {
     current = p;
     N = p.n_cells;
-    blockedSet = new Set(p.blocked.map((b) => key(b.q, b.r)));
-    givenSet = new Set(p.givens.map((g) => key(g.q, g.r)));
+    blockedSet = new Set(p.blocked.map((b) => key(b.col, b.row)));
+    givenSet = new Set(p.givens.map((g) => key(g.col, g.row)));
     filled = new Map();
-    p.givens.forEach((g) => filled.set(key(g.q, g.r), g.v));
+    p.givens.forEach((g) => filled.set(key(g.col, g.row), g.v));
 
     elapsed = 0;
     solved = false;
@@ -202,45 +202,63 @@
   }
 
   // Pixel center of a hex cell in board-local coordinates (pointy-top,
-  // rows offset horizontally). hexOffsetX/Y shift the whole board so the
-  // top-left-most hex starts flush at (0,0); buildBoard sets them each time
-  // the board is (re)built, before this is used for cell placement.
+  // odd rows shifted right by half a hex-width). hexOffsetX/Y shift the
+  // whole board so the top-left-most hex starts flush at (0,0);
+  // buildBoard sets them each time the board is (re)built, before this is
+  // used for cell placement.
   let hexOffsetX = 0, hexOffsetY = 0;
-  function hexCenter(q, r) {
+  function hexCenter(col, row) {
     return {
-      x: cellSize * (SQRT3 * q + (SQRT3 / 2) * r) - hexOffsetX,
-      y: cellSize * 1.5 * r - hexOffsetY,
+      x: cellSize * SQRT3 * (col + 0.5 * (row % 2)) - hexOffsetX,
+      y: cellSize * 1.5 * row - hexOffsetY,
     };
+  }
+
+  // Same axial-neighbor logic generator.js uses, kept in sync here so
+  // isAdjacent agrees with what the generator considers adjacent.
+  function offsetToAxial(col, row) { return { q: col - Math.floor(row / 2), r: row }; }
+
+  function isAdjacent(k1, k2) {
+    if (k1 === k2) return false;
+    const a = parseKey(k1), b = parseKey(k2);
+    const aAxial = offsetToAxial(a.col, a.row), bAxial = offsetToAxial(b.col, b.row);
+    const dq = aAxial.q - bAxial.q, dr = aAxial.r - bAxial.r;
+    return (Math.abs(dq) + Math.abs(dr) + Math.abs(dq + dr)) / 2 === 1;
   }
 
   function buildBoard() {
     els.board.innerHTML = "";
     cellEls = new Map();
-    const radius = current.radius;
+    const cols = current.cols, rows = current.rows;
 
-    // Size purely off available width so cells stay legible and touch-friendly;
-    // taller boards simply extend the board (and page) downward instead of
-    // being squeezed to fit one screen's height. The widest row of a
-    // radius-R hex board has 2R+1 cells.
+    // Size purely off available width so cell size stays constant across
+    // every difficulty (cols is fixed for all of them) -- taller boards
+    // simply extend the board (and page) downward instead of shrinking
+    // cells to fit one screen's height. The widest row spans cols+0.5
+    // hex-widths (the extra half from the odd-row horizontal offset).
     const wrapWidth = Math.min(window.innerWidth - 32, 520);
-    cellSize = Math.floor(wrapWidth / ((2 * radius + 1) * SQRT3));
+    cellSize = Math.floor(wrapWidth / ((cols + 0.5) * SQRT3));
     cellSize = Math.max(cellSize, 14);
 
     const hexW = SQRT3 * cellSize;
     const hexH = 2 * cellSize;
+    // Render each hex slightly smaller than its full tessellating size so a
+    // gap (revealing the board's background) shows between every pair of
+    // neighboring cells -- a border-like separator that doesn't depend on
+    // how `border` happens to render against a clip-path hexagon.
+    const renderW = hexW * 0.94;
+    const renderH = hexH * 0.94;
 
     // First pass (offset still 0): find the raw bounding box of every cell
-    // center in the hexagon-shaped board, blocked or not.
+    // center in the full cols x rows board, blocked or not.
     hexOffsetX = 0;
     hexOffsetY = 0;
     const keys = [];
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (let r = -radius; r <= radius; r++) {
-      const qMin = Math.max(-radius, -radius - r);
-      const qMax = Math.min(radius, radius - r);
-      for (let q = qMin; q <= qMax; q++) {
-        keys.push(key(q, r));
-        const { x, y } = hexCenter(q, r);
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        keys.push(key(col, row));
+        const { x, y } = hexCenter(col, row);
         minX = Math.min(minX, x); maxX = Math.max(maxX, x);
         minY = Math.min(minY, y); maxY = Math.max(maxY, y);
       }
@@ -261,14 +279,14 @@
 
     keys.forEach((k) => {
       if (blockedSet.has(k)) return; // no DOM element at all for holes
-      const { q, r } = parseKey(k);
-      const { x, y } = hexCenter(q, r);
+      const { col, row } = parseKey(k);
+      const { x, y } = hexCenter(col, row);
       const div = document.createElement("div");
       div.className = "cell";
-      div.style.width = hexW + "px";
-      div.style.height = hexH + "px";
-      div.style.left = (x - hexW / 2) + "px";
-      div.style.top = (y - hexH / 2) + "px";
+      div.style.width = renderW + "px";
+      div.style.height = renderH + "px";
+      div.style.left = (x - renderW / 2) + "px";
+      div.style.top = (y - renderH / 2) + "px";
       div.style.fontSize = Math.max(10, Math.floor(hexW * 0.4)) + "px";
       div.dataset.key = k;
       div.addEventListener("pointerdown", onPointerDown);
@@ -278,13 +296,6 @@
 
     document.addEventListener("pointermove", onPointerMove);
     document.addEventListener("pointerup", onPointerUp);
-  }
-
-  function isAdjacent(k1, k2) {
-    if (k1 === k2) return false;
-    const a = parseKey(k1), b = parseKey(k2);
-    const dq = a.q - b.q, dr = a.r - b.r;
-    return (Math.abs(dq) + Math.abs(dr) + Math.abs(dq + dr)) / 2 === 1;
   }
 
   // ---------- Rendering / validation ----------
@@ -344,8 +355,8 @@
     runs.forEach((run) => {
       if (run.length < 2) return;
       const pts = run.map((k) => {
-        const { q, r } = parseKey(k);
-        const { x, y } = hexCenter(q, r);
+        const { col, row } = parseKey(k);
+        const { x, y } = hexCenter(col, row);
         return x + "," + y;
       }).join(" ");
       const poly = document.createElementNS(ns, "polyline");
@@ -380,8 +391,8 @@
 
     const ns = "http://www.w3.org/2000/svg";
     const points = drag.path.map((k) => {
-      const { q, r } = parseKey(k);
-      const { x, y } = hexCenter(q, r);
+      const { col, row } = parseKey(k);
+      const { x, y } = hexCenter(col, row);
       return x + "," + y;
     });
     points.push(drag.lastPointerLocal.x + "," + drag.lastPointerLocal.y);
@@ -545,7 +556,7 @@
     const sol = current.solution;
     for (let v = 1; v <= N; v++) {
       const target = sol.find((s) => s.v === v);
-      const k = key(target.q, target.r);
+      const k = key(target.col, target.row);
       if (filled.get(k) !== v) {
         filled.set(k, v);
         renderBoard();

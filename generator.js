@@ -2,26 +2,36 @@
   "use strict";
 
   const SQRT3 = Math.sqrt(3);
+  const FORMAT = "hex-offset-v1";
 
-  function cellCount(radius) { return 3 * radius * radius + 3 * radius + 1; }
-
+  // Fixed width (columns) across every difficulty, so hex cell size stays
+  // constant regardless of puzzle size -- harder puzzles get taller boards,
+  // not smaller cells. Optimized for a vertical phone screen: width never
+  // grows, only height (rows) does.
   const DIFFS = {
-    Easy:        { radius: 2, blocked: 0,  cells: cellCount(2) },
-    Normal:      { radius: 3, blocked: 0,  cells: cellCount(3) },
-    Hard:        { radius: 4, blocked: 10, cells: cellCount(4) },
-    "Very Hard": { radius: 5, blocked: 15, cells: cellCount(5) },
-    Ultra:       { radius: 6, blocked: 20, cells: cellCount(6) },
+    Easy:        { cols: 6, rows: 3,  blocked: 0 },
+    Normal:      { cols: 6, rows: 6,  blocked: 0 },
+    Hard:        { cols: 6, rows: 10, blocked: 8 },
+    "Very Hard": { cols: 6, rows: 15, blocked: 13 },
+    Ultra:       { cols: 6, rows: 20, blocked: 18 },
   };
+  Object.keys(DIFFS).forEach((k) => { DIFFS[k].cells = DIFFS[k].cols * DIFFS[k].rows; });
 
-  // Axial hex coordinates (q, r). Neighbor offsets are constant regardless
-  // of position -- unlike offset/"odd-row" coordinates, there's no parity
-  // switch to get wrong.
+  // Public cell coordinates are a simple (col, row) offset grid -- easy to
+  // reason about and size for a rectangular phone screen. Axial hex
+  // coordinates (q, r) are used only internally, purely to compute
+  // neighbors: axial neighbor offsets are constant regardless of position,
+  // unlike offset coordinates which need a different neighbor rule for
+  // even/odd rows if you work in them directly.
   const AXIAL_DIRS = [
     [1, 0], [1, -1], [0, -1], [-1, 0], [0, 1], [-1, 1],
   ];
 
-  function key(q, r) { return q + "," + r; }
-  function parseKey(k) { const [q, r] = k.split(",").map(Number); return { q, r }; }
+  function key(col, row) { return col + "," + row; }
+  function parseKey(k) { const [col, row] = k.split(",").map(Number); return { col, row }; }
+
+  function offsetToAxial(col, row) { return { q: col - Math.floor(row / 2), r: row }; }
+  function axialToOffset(q, r) { return { col: q + Math.floor(r / 2), row: r }; }
 
   function randInt(n) { return Math.floor(Math.random() * n); }
   function shuffle(arr) {
@@ -32,27 +42,21 @@
     return arr;
   }
 
-  function hexDistance(q, r) {
-    return (Math.abs(q) + Math.abs(r) + Math.abs(q + r)) / 2;
-  }
-
-  // Every (q, r) within `radius` of the center -- a hexagon-shaped board.
-  function cellsInRadius(radius) {
+  function cellsInGrid(cols, rows) {
     const cells = [];
-    for (let r = -radius; r <= radius; r++) {
-      const qMin = Math.max(-radius, -radius - r);
-      const qMax = Math.min(radius, radius - r);
-      for (let q = qMin; q <= qMax; q++) cells.push(key(q, r));
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) cells.push(key(col, row));
     }
     return cells;
   }
 
-  function neighborKeys(q, r, radius, blocked) {
+  function neighborKeys(col, row, cols, rows, blocked) {
+    const { q, r } = offsetToAxial(col, row);
     const out = [];
     for (const [dq, dr] of AXIAL_DIRS) {
-      const nq = q + dq, nr = r + dr;
-      if (hexDistance(nq, nr) > radius) continue;
-      const k = key(nq, nr);
+      const { col: ncol, row: nrow } = axialToOffset(q + dq, r + dr);
+      if (ncol < 0 || ncol >= cols || nrow < 0 || nrow >= rows) continue;
+      const k = key(ncol, nrow);
       if (blocked.has(k)) continue;
       out.push(k);
     }
@@ -67,15 +71,15 @@
   }
 
   // Randomized Warnsdorff heuristic with backtracking, bounded by a step budget.
-  function findHamiltonianPath(radius, blocked, maxSteps) {
-    const cells = cellsInRadius(radius).filter((k) => !blocked.has(k));
+  function findHamiltonianPath(cols, rows, blocked, maxSteps) {
+    const cells = cellsInGrid(cols, rows).filter((k) => !blocked.has(k));
     const total = cells.length;
     if (total === 0) return null;
 
     const nbrCache = new Map();
     cells.forEach((k) => {
-      const { q, r } = parseKey(k);
-      nbrCache.set(k, neighborKeys(q, r, radius, blocked));
+      const { col, row } = parseKey(k);
+      nbrCache.set(k, neighborKeys(col, row, cols, rows, blocked));
     });
 
     let steps = 0;
@@ -115,31 +119,31 @@
     return null;
   }
 
-  function generatePath(radius, blockedCount) {
-    const cells = cellsInRadius(radius);
+  function generatePath(cols, rows, blockedCount) {
+    const cells = cellsInGrid(cols, rows);
     for (let count = blockedCount; count >= 0; count--) {
       const attempts = count === 0 ? 25 : 40;
       const budget = count === 0 ? 300000 : 4000;
       for (let attempt = 0; attempt < attempts; attempt++) {
         const blocked = pickBlocked(cells, count);
-        const path = findHamiltonianPath(radius, blocked, budget);
+        const path = findHamiltonianPath(cols, rows, blocked, budget);
         if (path) return { path, blocked };
       }
     }
     // Should be unreachable: a hole-free hex board is well-connected enough
     // that the Warnsdorff search above always finds a path in practice.
-    throw new Error("Failed to find a Hamiltonian path for hex radius " + radius);
+    throw new Error("Failed to find a Hamiltonian path for a " + cols + "x" + rows + " hex board");
   }
 
   // Counts solutions (capped at `limit`) consistent with the given clues.
   // Returns { count, timedOut }.
-  function countSolutions(radius, blocked, givenMap, N, limit, deadlineMs) {
+  function countSolutions(cols, rows, blocked, givenMap, N, limit, deadlineMs) {
     const deadline = Date.now() + deadlineMs;
-    const cells = cellsInRadius(radius).filter((k) => !blocked.has(k));
+    const cells = cellsInGrid(cols, rows).filter((k) => !blocked.has(k));
     const nbrCache = new Map();
     cells.forEach((k) => {
-      const { q, r } = parseKey(k);
-      nbrCache.set(k, neighborKeys(q, r, radius, blocked));
+      const { col, row } = parseKey(k);
+      nbrCache.set(k, neighborKeys(col, row, cols, rows, blocked));
     });
     const valueToGivenCell = new Map();
     givenMap.forEach((v, k) => valueToGivenCell.set(v, k));
@@ -199,7 +203,7 @@
   // clues from a fully-revealed board down to a locally-minimal unique set,
   // keeping each removal only if the puzzle stays uniquely solvable.
   function attemptGenerate(cfg) {
-    const { path, blocked } = generatePath(cfg.radius, cfg.blocked);
+    const { path, blocked } = generatePath(cfg.cols, cfg.rows, cfg.blocked);
     const N = path.length;
 
     const givenMap = new Map();
@@ -211,7 +215,7 @@
       if (Date.now() > deadline) break;
       const v = givenMap.get(k);
       givenMap.delete(k);
-      const result = countSolutions(cfg.radius, blocked, givenMap, N, 2, 150);
+      const result = countSolutions(cfg.cols, cfg.rows, blocked, givenMap, N, 2, 150);
       if (result.count > 1 || result.timedOut) givenMap.set(k, v);
     }
 
@@ -225,18 +229,20 @@
     const { path, blocked, N, givenMap } = attemptGenerate(cfg);
     const blockedList = Array.from(blocked).map((k) => parseKey(k));
     const givensList = Array.from(givenMap.entries()).map(([k, v]) => {
-      const { q, r } = parseKey(k);
-      return { q, r, v };
+      const { col, row } = parseKey(k);
+      return { col, row, v };
     });
     const solution = path.map((k, i) => {
-      const { q, r } = parseKey(k);
-      return { q, r, v: i + 1 };
+      const { col, row } = parseKey(k);
+      return { col, row, v: i + 1 };
     });
 
     return {
       id: difficulty.toLowerCase().replace(/\s+/g, "-") + "-" + Date.now().toString(36) + randInt(46656).toString(36),
+      format: FORMAT,
       difficulty,
-      radius: cfg.radius,
+      cols: cfg.cols,
+      rows: cfg.rows,
       n_cells: N,
       n_givens: givenMap.size,
       blocked: blockedList,
@@ -245,5 +251,5 @@
     };
   }
 
-  global.HidatoGen = { generate, DIFFS };
+  global.HidatoGen = { generate, DIFFS, FORMAT };
 })(window);
