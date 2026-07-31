@@ -62,8 +62,10 @@
     lastPointerLocal: null, // raw pointer position in board-local px, for the live trace tip
   };
 
-  function key(r, c) { return r + "," + c; }
-  function parseKey(k) { const [r, c] = k.split(",").map(Number); return { r, c }; }
+  const SQRT3 = Math.sqrt(3);
+
+  function key(q, r) { return q + "," + r; }
+  function parseKey(k) { const [q, r] = k.split(",").map(Number); return { q, r }; }
 
   function activeKey(diff) { return "hidato_active_" + diff; }
   function bestKey(diff) { return "hidato_best_" + diff; }
@@ -71,7 +73,12 @@
   function loadActive(diff) {
     try {
       const raw = localStorage.getItem(activeKey(diff));
-      return raw ? JSON.parse(raw) : null;
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      // Ignore saves from the old square-grid format (no `radius` field) --
+      // they're not resumable on the hex board.
+      if (!data || !data.puzzle || typeof data.puzzle.radius !== "number") return null;
+      return data;
     } catch (e) { return null; }
   }
 
@@ -131,7 +138,7 @@
       tile.className = "puzzle-tile";
       tile.innerHTML =
         '<div class="tile-id">' + diff + "</div>" +
-        '<div class="tile-size">' + meta.rows + "&times;" + meta.cols + "</div>" +
+        '<div class="tile-size">' + meta.cells + " cells</div>" +
         '<div class="tile-meta">' +
         (active ? "In progress &middot; " + fmtTime(active.elapsed || 0) : "Tap for a new puzzle") +
         (best ? " &middot; best " + fmtTime(best) : "") +
@@ -169,10 +176,10 @@
   function openPuzzle(p, resumeData) {
     current = p;
     N = p.n_cells;
-    blockedSet = new Set(p.blocked.map((b) => key(b.r, b.c)));
-    givenSet = new Set(p.givens.map((g) => key(g.r, g.c)));
+    blockedSet = new Set(p.blocked.map((b) => key(b.q, b.r)));
+    givenSet = new Set(p.givens.map((g) => key(g.q, g.r)));
     filled = new Map();
-    p.givens.forEach((g) => filled.set(key(g.r, g.c), g.v));
+    p.givens.forEach((g) => filled.set(key(g.q, g.r), g.v));
 
     elapsed = 0;
     solved = false;
@@ -194,64 +201,90 @@
     startTimer();
   }
 
+  // Pixel center of a hex cell in board-local coordinates (pointy-top,
+  // rows offset horizontally). hexOffsetX/Y shift the whole board so the
+  // top-left-most hex starts flush at (0,0); buildBoard sets them each time
+  // the board is (re)built, before this is used for cell placement.
+  let hexOffsetX = 0, hexOffsetY = 0;
+  function hexCenter(q, r) {
+    return {
+      x: cellSize * (SQRT3 * q + (SQRT3 / 2) * r) - hexOffsetX,
+      y: cellSize * 1.5 * r - hexOffsetY,
+    };
+  }
+
   function buildBoard() {
     els.board.innerHTML = "";
     cellEls = new Map();
-    const rows = current.rows, cols = current.cols;
+    const radius = current.radius;
 
     // Size purely off available width so cells stay legible and touch-friendly;
-    // taller/rectangular grids simply extend the board (and page) downward
-    // instead of being squeezed to fit one screen's height.
+    // taller boards simply extend the board (and page) downward instead of
+    // being squeezed to fit one screen's height. The widest row of a
+    // radius-R hex board has 2R+1 cells.
     const wrapWidth = Math.min(window.innerWidth - 32, 520);
-    cellSize = Math.floor(Math.min(wrapWidth / cols, 84));
-    cellSize = Math.max(cellSize, 26);
+    cellSize = Math.floor(wrapWidth / ((2 * radius + 1) * SQRT3));
+    cellSize = Math.max(cellSize, 14);
 
-    els.board.style.gridTemplateColumns = "repeat(" + cols + ", " + cellSize + "px)";
-    els.board.style.gridTemplateRows = "repeat(" + rows + ", " + cellSize + "px)";
-    els.board.style.width = (cellSize * cols) + "px";
-    els.board.style.height = (cellSize * rows) + "px";
-    els.boardWrap.style.width = (cellSize * cols) + "px";
-    els.boardWrap.style.height = (cellSize * rows) + "px";
-    els.svg.setAttribute("width", cellSize * cols);
-    els.svg.setAttribute("height", cellSize * rows);
-    els.svg.setAttribute("viewBox", "0 0 " + (cellSize * cols) + " " + (cellSize * rows));
+    const hexW = SQRT3 * cellSize;
+    const hexH = 2 * cellSize;
 
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const k = key(r, c);
-        const div = document.createElement("div");
-        div.className = "cell";
-        div.style.fontSize = Math.max(11, Math.floor(cellSize * 0.34)) + "px";
-        if (blockedSet.has(k)) {
-          div.classList.add("blocked");
-        } else {
-          div.dataset.key = k;
-          div.addEventListener("pointerdown", onPointerDown);
-        }
-        els.board.appendChild(div);
-        cellEls.set(k, div);
+    // First pass (offset still 0): find the raw bounding box of every cell
+    // center in the hexagon-shaped board, blocked or not.
+    hexOffsetX = 0;
+    hexOffsetY = 0;
+    const keys = [];
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (let r = -radius; r <= radius; r++) {
+      const qMin = Math.max(-radius, -radius - r);
+      const qMax = Math.min(radius, radius - r);
+      for (let q = qMin; q <= qMax; q++) {
+        keys.push(key(q, r));
+        const { x, y } = hexCenter(q, r);
+        minX = Math.min(minX, x); maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y); maxY = Math.max(maxY, y);
       }
     }
+    hexOffsetX = minX - hexW / 2;
+    hexOffsetY = minY - hexH / 2;
+
+    const boardWidth = (maxX - minX) + hexW;
+    const boardHeight = (maxY - minY) + hexH;
+
+    els.board.style.width = boardWidth + "px";
+    els.board.style.height = boardHeight + "px";
+    els.boardWrap.style.width = boardWidth + "px";
+    els.boardWrap.style.height = boardHeight + "px";
+    els.svg.setAttribute("width", boardWidth);
+    els.svg.setAttribute("height", boardHeight);
+    els.svg.setAttribute("viewBox", "0 0 " + boardWidth + " " + boardHeight);
+
+    keys.forEach((k) => {
+      if (blockedSet.has(k)) return; // no DOM element at all for holes
+      const { q, r } = parseKey(k);
+      const { x, y } = hexCenter(q, r);
+      const div = document.createElement("div");
+      div.className = "cell";
+      div.style.width = hexW + "px";
+      div.style.height = hexH + "px";
+      div.style.left = (x - hexW / 2) + "px";
+      div.style.top = (y - hexH / 2) + "px";
+      div.style.fontSize = Math.max(10, Math.floor(hexW * 0.4)) + "px";
+      div.dataset.key = k;
+      div.addEventListener("pointerdown", onPointerDown);
+      els.board.appendChild(div);
+      cellEls.set(k, div);
+    });
+
     document.addEventListener("pointermove", onPointerMove);
     document.addEventListener("pointerup", onPointerUp);
   }
 
-  function neighborsOf(r, c) {
-    const out = [];
-    for (let dr = -1; dr <= 1; dr++) {
-      for (let dc = -1; dc <= 1; dc++) {
-        if (dr === 0 && dc === 0) continue;
-        const rr = r + dr, cc = c + dc;
-        const k = key(rr, cc);
-        if (cellEls.has(k) && !blockedSet.has(k)) out.push(k);
-      }
-    }
-    return out;
-  }
-
   function isAdjacent(k1, k2) {
+    if (k1 === k2) return false;
     const a = parseKey(k1), b = parseKey(k2);
-    return Math.abs(a.r - b.r) <= 1 && Math.abs(a.c - b.c) <= 1 && k1 !== k2;
+    const dq = a.q - b.q, dr = a.r - b.r;
+    return (Math.abs(dq) + Math.abs(dr) + Math.abs(dq + dr)) / 2 === 1;
   }
 
   // ---------- Rendering / validation ----------
@@ -259,7 +292,6 @@
   function renderBoard() {
     const errorCells = computeErrors();
     cellEls.forEach((div, k) => {
-      if (blockedSet.has(k)) return;
       const v = filled.get(k);
       div.textContent = v ? v : "";
       div.classList.toggle("given", givenSet.has(k));
@@ -309,11 +341,12 @@
     }
     if (run.length) runs.push(run);
 
-    runs.forEach((r) => {
-      if (r.length < 2) return;
-      const pts = r.map((k) => {
-        const { r: row, c: col } = parseKey(k);
-        return (col * cellSize + cellSize / 2) + "," + (row * cellSize + cellSize / 2);
+    runs.forEach((run) => {
+      if (run.length < 2) return;
+      const pts = run.map((k) => {
+        const { q, r } = parseKey(k);
+        const { x, y } = hexCenter(q, r);
+        return x + "," + y;
       }).join(" ");
       const poly = document.createElementNS(ns, "polyline");
       poly.setAttribute("points", pts);
@@ -347,8 +380,9 @@
 
     const ns = "http://www.w3.org/2000/svg";
     const points = drag.path.map((k) => {
-      const { r, c } = parseKey(k);
-      return (c * cellSize + cellSize / 2) + "," + (r * cellSize + cellSize / 2);
+      const { q, r } = parseKey(k);
+      const { x, y } = hexCenter(q, r);
+      return x + "," + y;
     });
     points.push(drag.lastPointerLocal.x + "," + drag.lastPointerLocal.y);
 
@@ -511,7 +545,7 @@
     const sol = current.solution;
     for (let v = 1; v <= N; v++) {
       const target = sol.find((s) => s.v === v);
-      const k = key(target.r, target.c);
+      const k = key(target.q, target.r);
       if (filled.get(k) !== v) {
         filled.set(k, v);
         renderBoard();
@@ -584,8 +618,7 @@
   }
 
   function checkWin() {
-    const totalCells = current.rows * current.cols - current.blocked.length;
-    if (filled.size !== totalCells) return;
+    if (filled.size !== N) return;
     const errors = computeErrors();
     if (errors.size !== 0) return;
     const values = new Set(filled.values());

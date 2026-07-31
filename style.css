@@ -7,6 +7,7 @@
   --amber: #B5772B;
   --amber-soft: #E8CBA0;
   --given-bg: #FBF3E8;
+  --selected-bg: #D9C08C;
   --error: #B03A2E;
   --error-bg: #F6E1DE;
   --solved: #3A7D5C;
@@ -25,6 +26,7 @@
   --amber: #E0A458;
   --amber-soft: #4A3823;
   --given-bg: #3A2E1C;
+  --selected-bg: #5C4726;
   --error: #E5776A;
   --error-bg: #4A2620;
   --solved: #6FBF95;
@@ -216,7 +218,6 @@ html, body {
 }
 
 #board {
-  display: grid;
   position: relative;
   border: 2px solid var(--ink);
   border-radius: 6px;
@@ -225,7 +226,7 @@ html, body {
 }
 
 .cell {
-  position: relative;
+  position: absolute;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -234,10 +235,7 @@ html, body {
   font-weight: 600;
   color: var(--ink);
   background: var(--card);
-}
-.cell.blocked {
-  background: transparent;
-  border-color: transparent;
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
 }
 .cell.given {
   color: var(--amber);
@@ -246,14 +244,13 @@ html, body {
 }
 .cell.filled { color: var(--ink); }
 .cell.selected {
-  outline: 2px solid var(--ink);
-  outline-offset: -2px;
+  background: var(--selected-bg);
   z-index: 2;
 }
 .cell.endpoint::after {
   content: "";
   position: absolute;
-  inset: 4px;
+  inset: 22% 8%;
   border-radius: 50%;
   border: 1.5px dashed var(--amber);
 }
